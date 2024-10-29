@@ -7,6 +7,8 @@ main_class = 'Bno055Test'
 src_files = files(
   'Bno055Test.java',
   'net/coppelab/java/bno055/Bno055.java',
+  'net/coppelab/java/bno055/AMGRaw.java',
+  'net/coppelab/java/geo/Point3D.java',
 )
 
 processing_root = get_option('processing_path')
