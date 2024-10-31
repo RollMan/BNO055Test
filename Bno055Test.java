@@ -1,13 +1,15 @@
+import processing.core.*;
 import processing.serial.*;
-import static processing.core.*;
 
 import net.coppelab.java.bno055.Bno055;
 import net.coppelab.java.bno055.AMGRaw;
 
 public class Bno055Test extends PApplet {
     Bno055 bno055;
+    PFont f;
 
     public void settings() {
+        size(200, 200);
     }
 
     public void setup() {
@@ -17,12 +19,14 @@ public class Bno055Test extends PApplet {
         }
         final String PORT_PATH = this.args[0];
         final int BAUD = 115200;
-        final char PARITY = 0;
+        final char PARITY = 'N';
         final char BITS = 8;
         final char STOP = 1;
         Serial serial = new Serial(this, PORT_PATH, BAUD, PARITY, BITS, STOP);
         bno055 = new Bno055(serial);
-        // bno055.reset();
+        delay(30);
+        // bno055.reset_system();
+        // delay(30);
         int current_operation_mode = bno055.get_operation_mode();
         if (current_operation_mode < 0) {
             println("Failed to get the current operation mode: " + hex(current_operation_mode));
@@ -39,16 +43,25 @@ public class Bno055Test extends PApplet {
             println("Failed to set power mode: " + hex(set_pwr_mode_res));
             System.exit(1);
         }
+
+        f = createFont("Noto Sans CJK JP", 16, true);
     }
 
+
+    int cnt = 0;
     public void draw() {
         AMGRaw amg = bno055.get_amg_raw();
+        background(255);
+        textFont(f, 16);
+        fill(0);
         if (amg == null) {
-            println("read failed");
-            bno055.reset();
-            return;
+            // bno055.reset();
+            text("placeholder", 10, 100);
+        }else{
+            text(amg.gyr.x + ", " + amg.gyr.y + ", " + amg.gyr.z, 10, 100);
         }
-        println("" + amg.gyr.x + " " + amg.gyr.y + " " + amg.gyr.z);
+        cnt += 1;
+        text("cnt: " + cnt, 10, 10);
         delay(100);
     }
 
