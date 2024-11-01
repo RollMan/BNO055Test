@@ -246,7 +246,8 @@ public class Bno055 {
     }
 
     private int concat_word(int lower, int upper) {
-        return (upper << 8) | lower;
+        short result = (short)((upper << 8) | lower);
+        return (int)result;
     }
 
     /**
