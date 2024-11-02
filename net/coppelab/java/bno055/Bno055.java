@@ -27,32 +27,16 @@ public class Bno055 {
     static private int read_response_bytes(int datalen){
         return datalen + 1;     // Data bytes + len byte.
     }
-    private boolean wait_for_response() {
-        long start = System.currentTimeMillis();
-        while (true) {
-            int avail = port.available();
-            if (avail >= 1){
-                break;
-            }
-            long elapsed = System.currentTimeMillis() - start;
-            if (elapsed > TIMEOUT) {
-                return false;
-            }
-        }
-        return true;
-    }
 
-    private boolean wait_for_response_count(int n){
+    private boolean wait_for_response(){
         long start = System.currentTimeMillis();
-        while (true) {
-            int avail = port.available();
-            if (avail >= n){
-                break;
-            }
-            long elapsed = System.currentTimeMillis() - start;
-            Bno055.DEBUG_PRINTLN.apply("waiting " + avail + ", " + elapsed);
-            if (elapsed > TIMEOUT) {
+        while (port.available() == 0) {
+            if (System.currentTimeMillis() - start > TIMEOUT) {
                 return false;
+            }
+            try {
+                Thread.sleep(1);
+            }catch (InterruptedException e){
             }
         }
         return true;
