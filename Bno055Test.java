@@ -65,6 +65,10 @@ public class Bno055Test extends PApplet {
         delay(100);
     }
 
+    void serialEvent(Serial p){
+        bno055.hook.apply(p);
+    }
+
     public static void main(String[] args) {
         PApplet.main("Bno055Test", args);
     }

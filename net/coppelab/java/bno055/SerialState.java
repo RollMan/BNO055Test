@@ -1,0 +1,11 @@
+package net.coppelab.java.bno055;
+
+public enum SerialState {
+    IDLE,
+    WAITING_WRITE_RESPONSE_HEADER,
+    WAITING_WRITE_STATUS,
+    WAITING_READ_RESPONSE_HEADER,
+    WAITING_READ_STATUS,
+    WAITING_READ_LENGTH,
+    WAITING_READ_DATA,
+};

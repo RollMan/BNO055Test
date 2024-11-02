@@ -1,13 +1,15 @@
 project('Bno055Test', 'java',
   version : '0.1',
   meson_version: '>= 1.1, < 2.0',
-  default_options : ['warning_level=3'])
+  default_options : ['warning_level=1'])
 
 main_class = 'Bno055Test'
 src_files = files(
   'Bno055Test.java',
-  'net/coppelab/java/bno055/Bno055.java',
   'net/coppelab/java/bno055/AMGRaw.java',
+  'net/coppelab/java/bno055/SerialState.java',
+  'net/coppelab/java/bno055/Bno055.java',
+  'net/coppelab/java/bno055/Handler.java',
   'net/coppelab/java/geo/Point3D.java',
 )
 

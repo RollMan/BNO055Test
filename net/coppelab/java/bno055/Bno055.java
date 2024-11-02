@@ -1,7 +1,12 @@
 package net.coppelab.java.bno055;
 
 import processing.serial.*;
+import java.util.function.BiFunction;
 import java.util.function.Function;
+
+import net.coppelab.java.bno055.SerialState;
+
+import java.util.ArrayList;
 
 public class Bno055 {
     static private void debug_println(String str) {
@@ -18,17 +23,78 @@ public class Bno055 {
     static public final byte OPR_MODE_AMG = 0x07;
     static public final byte ACC_DATA_X_LSB_ADDR = 0x08;
     Serial port;
+    private AMGRaw amgraw;
+    private SerialState state;
+    private int len;
+    private int addr;
+    private ArrayList<Integer> recv_buf;
+    private int recv_buf_idx;
+    public Function<Serial, Void> hook;
 
     public Bno055(Serial port) {
         this.port = port;
+        this.state = SerialState.IDLE;
+        this.amgraw = new AMGRaw();
+        this.hook = (p) -> {return null;};
+    }
+
+    private void register_hook(Function<Integer, Void> write_callback, BiFunction<Integer, ArrayList<Integer>, Void> read_callback){
+        this.hook = (p) -> {
+            hook_(
+                p,
+                write_callback,
+                read_callback
+            );
+            return null;
+        };
+    }
+
+    private void hook_(Serial port, Function<Integer, Void> write_callback, BiFunction<Integer, ArrayList<Integer>, Void> read_callback) {
+        while (port.available() > 0) {
+            int recv = port.read();
+            switch (this.state) {
+                case IDLE:
+                    // unexpected error.
+                    break;
+                case WAITING_WRITE_RESPONSE_HEADER:
+                    this.state = Handler.handle_write_response(port, recv);
+                    break;
+                case WAITING_WRITE_STATUS:
+                    this.state = SerialState.IDLE;
+                    write_callback.apply(recv);
+                    break;
+                case WAITING_READ_RESPONSE_HEADER:
+                    this.state = Handler.handle_read_response(port, recv);
+                    break;
+                case WAITING_READ_STATUS:
+                    this.state = SerialState.IDLE;
+                    read_callback.apply(recv, new ArrayList<Integer>(0));
+                    break;
+                case WAITING_READ_LENGTH:
+                    this.state = SerialState.WAITING_READ_DATA;
+                    len = recv;
+                    recv_buf_idx = 0;
+                    recv_buf = new ArrayList<Integer>(len);
+                    break;
+                case WAITING_READ_DATA:
+                    recv_buf.set(recv_buf_idx, recv);
+                    recv_buf_idx += 1;
+                    if (recv_buf_idx == len){
+                        this.state = SerialState.IDLE;
+                        read_callback.apply(0, recv_buf);
+                    }
+                    break;
+            }
+        }
     }
 
     static final long TIMEOUT = 100; // ms
-    static private int read_response_bytes(int datalen){
-        return datalen + 1;     // Data bytes + len byte.
+
+    static private int read_response_bytes(int datalen) {
+        return datalen + 1; // Data bytes + len byte.
     }
 
-    private boolean wait_for_response(){
+    private boolean wait_for_response() {
         long start = System.currentTimeMillis();
         while (port.available() == 0) {
             if (System.currentTimeMillis() - start > TIMEOUT) {
@@ -36,20 +102,20 @@ public class Bno055 {
             }
             try {
                 Thread.sleep(1);
-            }catch (InterruptedException e){
+            } catch (InterruptedException e) {
             }
         }
         return true;
     }
 
-    private void write(byte data[]){
+    private void write(byte data[]) {
         port.write(data);
         // for(int i = 0; i < data.length; i++){
-        //     port.write(data[i]);
+        // port.write(data[i]);
         // }
     }
 
-    private int issue_write_command_sync(byte addr, byte len, byte data[]) {
+    private void issue_write_command_sync(byte addr, byte len, byte data[]) {
         port.clear();
         Bno055.DEBUG_PRINTLN.apply("Writing " + addr + " " + len);
         final int buf_size = 4 + len;
@@ -62,26 +128,9 @@ public class Bno055 {
             command[i + 4] = data[i];
         }
         write(command);
-        Bno055.DEBUG_PRINTLN.apply("Waiting for write acknoledgement header for " + command[2] + " " + command[3] + " "
-                + command[4] + " len: " + command.length);
-        if (!wait_for_response()) {
-            Bno055.DEBUG_PRINTLN.apply("timeout");
-            return -2;
-        }
-        int ack_header = port.read();
-        if (ack_header != 0xEE) {
-            return -1;
-        }
-        Bno055.DEBUG_PRINTLN.apply("Waiting for write acknoledgement status.");
-        if (!wait_for_response()) {
-            Bno055.DEBUG_PRINTLN.apply("timeout");
-            return -3;
-        }
-        int res = port.read();
-        return res;
     }
 
-    private int[] issue_read_command_sync(byte addr, byte len) {
+    private void issue_read_command_sync(byte addr, byte len) {
         port.clear();
         Bno055.DEBUG_PRINTLN.apply("Reading " + addr + " " + len);
         byte command[] = new byte[] {
@@ -91,60 +140,27 @@ public class Bno055 {
                 len,
         };
         write(command);
-        Bno055.DEBUG_PRINTLN.apply("waiting first response");
-        if (!wait_for_response()) {
-            Bno055.DEBUG_PRINTLN.apply("timeout");
-            return new int[] {};
-        }
-        int response_byte = port.read();
-        if (response_byte != 0xBB) {
-            if (response_byte == 0xEE) {
-                Bno055.DEBUG_PRINTLN.apply("Error when reading a register: ");
-                if(!wait_for_response()){
-                    port.clear();
-                    Bno055.DEBUG_PRINTLN.apply("Failed to receive read fault status.");
-                }else{
-                    int status = port.read();
-                    Bno055.DEBUG_PRINTLN.apply("" + status);
-                }
-            } else {
-                Bno055.DEBUG_PRINTLN.apply("Invalid response start byte: " + response_byte);
-            }
-            return new int[] {};
-        }
-        Bno055.DEBUG_PRINTLN.apply("waiting len response");
-        if (!wait_for_response()) {
-            Bno055.DEBUG_PRINTLN.apply("timeout");
-            return new int[] {};
-        }
-        final int response_len = port.read();
-        if ((byte) response_len != len) {
-            Bno055.DEBUG_PRINTLN.apply("warning: response_len != len: " + response_len + " " + len);
-        }
-        int result[] = new int[response_len];
-        for(int i = 0; i < response_len; i++){
-            if(!wait_for_response()) {
-                Bno055.DEBUG_PRINTLN.apply("timeout");
-                port.clear();
-                return new int[]{};
-            }else{
-                result[i] = port.read();
-            }
-        }
-        return result;
     }
 
-    private int select_register_page(byte page) {
+    private void select_register_page(byte page, Function<Integer, Void> write_callback, BiFunction<Integer, ArrayList<Integer>, Void> read_callback_) {
         final byte PAGE_ID_ADDR = 0x07;
-        int[] current_page = issue_read_command_sync(PAGE_ID_ADDR, (byte) 1);
-        if (current_page.length != 1) {
-            return -1;
-        }
-        int res = 0x01;
-        if (current_page[0] != page) {
-            res = issue_write_command_sync(PAGE_ID_ADDR, (byte) 1, new byte[] { page });
-        }
-        return res;
+        BiFunction<Integer, ArrayList<Integer>, Void> read_callback = (err, dat) -> {
+            if (err != 0){
+                read_callback_.apply(err, dat);
+            }else{
+                if(dat != null && dat.size() == 1){
+                    Integer read_page = dat.get(0);
+                    if (read_page != page){
+                        issue_write_command_sync(PAGE_ID_ADDR, (byte)1, new byte[] {page});
+                    }
+                }else{
+                    read_callback_.apply(-1, dat);
+                }
+            }
+            return null;
+        };
+        register_hook(write_callback, read_callback);
+        issue_read_command_sync(PAGE_ID_ADDR, (byte) 1);
     }
 
     public int set_operation_mode(byte operation_mode) {
@@ -233,8 +249,8 @@ public class Bno055 {
     }
 
     private int concat_word(int lower, int upper) {
-        short result = (short)((upper << 8) | lower);
-        return (int)result;
+        short result = (short) ((upper << 8) | lower);
+        return (int) result;
     }
 
     /**
@@ -260,6 +276,6 @@ public class Bno055 {
     public void reset_system() {
         final byte SYS_TRIGGER_ADDR = 0x3F;
         final byte RST_SYS = 1 << 5;
-        issue_write_command_sync(SYS_TRIGGER_ADDR, (byte)1, new byte[]{RST_SYS});
+        issue_write_command_sync(SYS_TRIGGER_ADDR, (byte) 1, new byte[] { RST_SYS });
     }
 }
