@@ -29,7 +29,11 @@ public class Bno055 {
     }
     private boolean wait_for_response() {
         long start = System.currentTimeMillis();
-        while (port.available() == 0) {
+        while (true) {
+            int avail = port.available();
+            if (avail >= 1){
+                break;
+            }
             long elapsed = System.currentTimeMillis() - start;
             if (elapsed > TIMEOUT) {
                 return false;
@@ -76,7 +80,7 @@ public class Bno055 {
         write(command);
         Bno055.DEBUG_PRINTLN.apply("Waiting for write acknoledgement header for " + command[2] + " " + command[3] + " "
                 + command[4] + " len: " + command.length);
-        if (!wait_for_response_count(1)) {
+        if (!wait_for_response()) {
             Bno055.DEBUG_PRINTLN.apply("timeout");
             return -2;
         }
@@ -85,7 +89,7 @@ public class Bno055 {
             return -1;
         }
         Bno055.DEBUG_PRINTLN.apply("Waiting for write acknoledgement status.");
-        if (!wait_for_response_count(1)) {
+        if (!wait_for_response()) {
             Bno055.DEBUG_PRINTLN.apply("timeout");
             return -3;
         }
@@ -104,7 +108,7 @@ public class Bno055 {
         };
         write(command);
         Bno055.DEBUG_PRINTLN.apply("waiting first response");
-        if (!wait_for_response_count(1)) {
+        if (!wait_for_response()) {
             Bno055.DEBUG_PRINTLN.apply("timeout");
             return new int[] {};
         }
@@ -112,7 +116,9 @@ public class Bno055 {
         if (response_byte != 0xBB) {
             if (response_byte == 0xEE) {
                 Bno055.DEBUG_PRINTLN.apply("Error when reading a register: ");
-                if(!wait_for_response_count(1)){
+                if(!wait_for_response()){
+                    port.clear();
+                    Bno055.DEBUG_PRINTLN.apply("Failed to receive read fault status.");
                 }else{
                     int status = port.read();
                     Bno055.DEBUG_PRINTLN.apply("" + status);
@@ -123,7 +129,7 @@ public class Bno055 {
             return new int[] {};
         }
         Bno055.DEBUG_PRINTLN.apply("waiting len response");
-        if (!wait_for_response_count(1)) {
+        if (!wait_for_response()) {
             Bno055.DEBUG_PRINTLN.apply("timeout");
             return new int[] {};
         }
@@ -131,20 +137,17 @@ public class Bno055 {
         if ((byte) response_len != len) {
             Bno055.DEBUG_PRINTLN.apply("warning: response_len != len: " + response_len + " " + len);
         }
-        byte result[] = new byte[response_len];
-        if(!wait_for_response_count(response_len)){
+        int result[] = new int[response_len];
+        for(int i = 0; i < response_len; i++){
+            if(!wait_for_response()) {
                 Bno055.DEBUG_PRINTLN.apply("timeout");
-                return new int[] {};
+                port.clear();
+                return new int[]{};
+            }else{
+                result[i] = port.read();
+            }
         }
-        int recv_data_bytes = port.readBytes(result);
-        if(recv_data_bytes != response_len){
-            Bno055.DEBUG_PRINTLN.apply("warning: received less bytes than expected: " + response_len + " " + recv_data_bytes);
-        }
-        int[] result_int = new int[response_len];
-        for(int i = 0; i < result.length; i++){
-            result_int[i] = 0xff & (int)result[i];
-        }
-        return result_int;
+        return result;
     }
 
     private int select_register_page(byte page) {
