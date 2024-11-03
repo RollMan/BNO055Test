@@ -31,8 +31,8 @@ public class Bno055Test extends PApplet {
         if (current_operation_mode < 0) {
             println("Failed to get the current operation mode: " + hex(current_operation_mode));
             System.exit(1);
-        } else if (current_operation_mode != Bno055.OPR_MODE_GYROONLY) {
-            int set_operation_mode_res = bno055.set_operation_mode(Bno055.OPR_MODE_GYROONLY);
+        } else if (current_operation_mode != Bno055.OPR_MODE_AMG) {
+            int set_operation_mode_res = bno055.set_operation_mode(Bno055.OPR_MODE_AMG);
             if (set_operation_mode_res != 0x01) {
                 println("Failed to set operation mode: " + hex(set_operation_mode_res));
                 System.exit(1);
@@ -58,7 +58,9 @@ public class Bno055Test extends PApplet {
             // bno055.reset();
             text("placeholder", 10, 100);
         }else{
-            text(amg.gyr.x + ", " + amg.gyr.y + ", " + amg.gyr.z, 10, 100);
+            text("gry: " + amg.gyr.x + ", " + amg.gyr.y + ", " + amg.gyr.z, 10, 100);
+            text("acc: " + amg.acc.x + ", " + amg.acc.y + ", " + amg.acc.z, 10, 118);
+            text("mag: " + amg.mag.x + ", " + amg.mag.y + ", " + amg.mag.z, 10, 136);
         }
         cnt += 1;
         text("cnt: " + cnt, 10, 10);
