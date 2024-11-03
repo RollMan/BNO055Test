@@ -14,8 +14,11 @@ public class Bno055 {
     };
 
     static public final byte OPR_MODE_ADDR = 0x3D;
+    // TODO: enum
+    static public final byte OPR_MODE_CONFIG = 0x00;
     static public final byte OPR_MODE_GYROONLY = 0x03;
     static public final byte OPR_MODE_AMG = 0x07;
+
     static public final byte ACC_DATA_X_LSB_ADDR = 0x08;
     Serial port;
 
@@ -202,6 +205,20 @@ public class Bno055 {
             return -1;
         }
         return recv[0] << 8 | recv[1];
+    }
+
+    public int set_unit_sel(byte unit_sel){
+        final byte UNIT_SEL = 0x3B;
+        int[] current_unit_sel_buf = issue_read_command_sync(UNIT_SEL, (byte)1);
+        if (current_unit_sel_buf.length != 1){
+            return -1;
+        }
+        int current_unit_sel = current_unit_sel_buf[0];
+        System.out.println(current_unit_sel);
+        if(unit_sel != (byte)current_unit_sel){
+            return issue_write_command_sync(UNIT_SEL, (byte)1, new byte[]{unit_sel});
+        }
+        return 0x01;
     }
 
     public AMGRaw get_amg_raw() {
