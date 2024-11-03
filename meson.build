@@ -4,8 +4,10 @@ project('Bno055Test', 'java',
   default_options : ['warning_level=3'])
 
 main_class = 'Bno055Test'
-src_files = files(
+main_src_file = files(
   'Bno055Test.java',
+)
+bno055_src = files(
   'net/coppelab/java/bno055/Bno055.java',
   'net/coppelab/java/bno055/AMGRaw.java',
   'net/coppelab/java/geo/Point3D.java',
@@ -38,10 +40,16 @@ javac_args = [
   '--class-path', classpath,
 ]
 
+bno055_dep = declare_dependency(
+  sources: bno055_src,
+  compile_args: javac_args,
+)
+
 bno055_test_jar = jar('Bno055Test',
-    src_files,
+    main_src_file,
     main_class: main_class,
     install : false,
+    dependencies: bno055_dep,
     java_args: javac_args,
 )
 
