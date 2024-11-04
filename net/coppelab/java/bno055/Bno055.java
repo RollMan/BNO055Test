@@ -8,6 +8,10 @@ public class Bno055 {
         System.out.println(str);
     }
 
+    static public float convert_gyro_radian_reading(float r){
+        return r / (float)900.0;
+    }
+
     static private Function<String, Void> DEBUG_PRINTLN = (str) -> {
         // debug_println(str);
         return null;
